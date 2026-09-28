@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI or Cake?</title>
+  <style>
+    :root {
+      --correct: #16a34a;
+      --wrong: #dc2626;
+      --ink: #1a1a1a;
+      --muted: #666;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: var(--ink);
+      background: #f4f4f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100%;
+      padding: 1.5rem 1rem 2rem;
+      text-align: center;
+    }
+    h1 { font-size: clamp(1.8rem, 5vw, 3rem); margin: 0 0 .25rem; }
+    #progress { font-size: clamp(1rem, 2.5vw, 1.4rem); color: var(--muted); margin-bottom: .75rem; font-weight: 600; }
+
+    #image-frame {
+      position: relative;
+      border: 8px solid #d4d4d8;
+      border-radius: 14px;
+      background: #fff;
+      padding: 6px;
+      transition: border-color 120ms ease;
+      line-height: 0;
+    }
+    #image-frame.correct { border-color: var(--correct); }
+    #image-frame.wrong   { border-color: var(--wrong); }
+    #game-img {
+      height: min(60vh, 560px);
+      width: auto;
+      max-width: 90vw;
+      object-fit: contain;
+      border-radius: 8px;
+      display: block;
+    }
+
+    /* Subtle attribution: info icon (lower-left) that reveals credit on hover/focus */
+    #attribution {
+      position: absolute;
+      left: 14px;
+      bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      line-height: 1.2;
+    }
+    #info-icon {
+      flex: none;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.55);
+      color: #333;
+      font-family: Georgia, "Times New Roman", serif;
+      font-style: italic;
+      font-weight: 700;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: help;
+      -webkit-backdrop-filter: blur(2px);
+      backdrop-filter: blur(2px);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+      transition: background 120ms ease;
+    }
+    #attribution:hover #info-icon,
+    #attribution:focus-within #info-icon { background: rgba(255, 255, 255, 0.9); }
+    #attribution-text {
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      text-align: left;
+      background: rgba(255, 255, 255, 0.9);
+      color: #222;
+      border-radius: 6px;
+      font-size: clamp(0.72rem, 1.5vw, 0.9rem);
+      padding: 5px 10px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+      transition: opacity 150ms ease, visibility 150ms ease;
+    }
+    #attribution:hover #attribution-text,
+    #attribution:focus-within #attribution-text {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .buttons { margin-top: 1.25rem; display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+    button {
+      font-size: clamp(1.1rem, 3vw, 1.6rem);
+      font-weight: 700;
+      padding: .7em 1.6em;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      color: #fff;
+      transition: transform 80ms ease, opacity 120ms ease;
+    }
+    button:active { transform: scale(0.97); }
+    #btn-ai   { background: #7c3aed; }
+    #btn-real { background: #2563eb; }
+    #btn-next { background: #111827; }
+    #btn-again { background: #111827; }
+
+    #reveal { margin-top: 1.1rem; min-height: 3.5rem; }
+    #reveal.hidden { visibility: hidden; }
+    #verdict { font-size: clamp(1.3rem, 4vw, 2rem); font-weight: 800; }
+    #verdict.correct { color: var(--correct); }
+    #verdict.wrong   { color: var(--wrong); }
+    #label { font-size: clamp(1rem, 2.8vw, 1.4rem); color: var(--muted); margin: .2rem 0 .6rem; }
+
+    /* End screen */
+    #end.hidden, #game.hidden { display: none; }
+    #end { display: flex; flex-direction: column; align-items: center; gap: 1rem; margin-top: 2rem; }
+    #final-score { font-size: clamp(2rem, 8vw, 4rem); font-weight: 800; }
+    #final-msg { font-size: clamp(1.1rem, 3vw, 1.6rem); color: var(--muted); }
+  </style>
+</head>
+<body>
+  <h1>AI or Cake?</h1>
+
+  <div id="game">
+    <div id="progress">Image 1 of 6</div>
+    <div id="image-frame">
+      <img id="game-img" alt="Cake to classify">
+      <div id="attribution" tabindex="0" title="Image credit">
+        <span id="info-icon" aria-hidden="true">i</span>
+        <span id="attribution-text"></span>
+      </div>
+    </div>
+    <div class="buttons" id="guess-buttons">
+      <button id="btn-ai" onclick="guess('synthetic')">AI</button>
+      <button id="btn-real" onclick="guess('real')">Real cake</button>
+    </div>
+    <div id="reveal" class="hidden">
+      <div id="verdict"></div>
+      <div id="label"></div>
+      <button id="btn-next" onclick="next()">Next &rarr;</button>
+    </div>
+  </div>
+
+  <div id="end" class="hidden">
+    <div id="final-score"></div>
+    <div id="final-msg"></div>
+    <button id="btn-again" onclick="startGame()">Play again</button>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

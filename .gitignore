@@ -1,0 +1,7 @@
+.DS_Store
+
+# Discarded candidate images — kept locally, not deployed
+images/trash/
+
+# Full-resolution originals — kept locally, not deployed (site uses downscaled copies)
+images/_originals/
