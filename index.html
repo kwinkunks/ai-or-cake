@@ -52,7 +52,7 @@
     #attribution {
       position: absolute;
       left: 14px;
-      bottom: 14px;
+      bottom: 28px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -123,6 +123,72 @@
     #verdict.wrong   { color: var(--wrong); }
     #label { font-size: clamp(1rem, 2.8vw, 1.4rem); color: var(--muted); margin: .2rem 0 .6rem; }
 
+    /* HUD: progress + running score */
+    #hud {
+      display: flex;
+      justify-content: center;
+      align-items: baseline;
+      gap: 2rem;
+      flex-wrap: wrap;
+      margin-bottom: .75rem;
+    }
+    #hud #progress { margin: 0; }
+    #score-display { font-size: clamp(1rem, 2.5vw, 1.4rem); font-weight: 800; color: var(--ink); }
+
+    /* Countdown bar across the bottom of the image */
+    #timer-bar {
+      position: absolute;
+      left: 6px;
+      right: 6px;
+      bottom: 6px;
+      height: 12px;
+      border-radius: 0 0 6px 6px;
+      background: var(--wrong);
+      box-shadow: 0 0 6px rgba(220, 38, 38, 0.6);
+      transform-origin: left center;
+      transform: scaleX(1);
+    }
+
+    /* Points currently on the clock for this image */
+    #worth {
+      margin-top: .6rem;
+      font-size: clamp(1rem, 2.6vw, 1.35rem);
+      font-weight: 700;
+      color: var(--wrong);
+      min-height: 1.6em;
+    }
+    #worth.hidden { visibility: hidden; }
+
+    #points-earned { font-size: clamp(1.1rem, 3vw, 1.6rem); font-weight: 800; margin: .1rem 0; }
+    #points-earned.correct { color: var(--correct); }
+    #points-earned.wrong { color: var(--muted); }
+
+    /* Intro modal over a blurred backdrop */
+    #app.blurred { filter: blur(12px); pointer-events: none; user-select: none; }
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(20, 20, 22, 0.35);
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-card {
+      width: 100%;
+      max-width: 560px;
+      background: #fff;
+      border-radius: 18px;
+      padding: 2rem clamp(1.2rem, 4vw, 2.5rem);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      text-align: center;
+    }
+    .modal-card h2 { font-size: clamp(1.6rem, 5vw, 2.6rem); margin: 0 0 1rem; }
+    .modal-card p { font-size: clamp(1rem, 2.6vw, 1.3rem); line-height: 1.5; margin: .6rem 0; color: #333; }
+    #btn-play { background: #16a34a; margin-top: 1.4rem; font-size: clamp(1.2rem, 3.4vw, 1.8rem); }
+
     /* End screen */
     #end.hidden, #game.hidden { display: none; }
     #end { display: flex; flex-direction: column; align-items: center; gap: 1rem; margin-top: 2rem; }
@@ -131,32 +197,49 @@
   </style>
 </head>
 <body>
-  <h1>AI or Cake?</h1>
+  <div id="app">
+    <h1>AI or Cake?</h1>
 
-  <div id="game">
-    <div id="progress">Image 1 of 6</div>
-    <div id="image-frame">
-      <img id="game-img" alt="Cake to classify">
-      <div id="attribution" tabindex="0" title="Image credit">
-        <span id="info-icon" aria-hidden="true">i</span>
-        <span id="attribution-text"></span>
+    <div id="game">
+      <div id="hud">
+        <span id="progress">Image 1 of 10</span>
+        <span id="score-display">Score: 0</span>
+      </div>
+      <div id="image-frame">
+        <img id="game-img" alt="Cake to classify">
+        <div id="timer-bar"></div>
+        <div id="attribution" tabindex="0" title="Image credit">
+          <span id="info-icon" aria-hidden="true">i</span>
+          <span id="attribution-text"></span>
+        </div>
+      </div>
+      <div id="worth">Worth now: 10</div>
+      <div class="buttons" id="guess-buttons">
+        <button id="btn-ai" onclick="guess('synthetic')">AI</button>
+        <button id="btn-real" onclick="guess('real')">Real cake</button>
+      </div>
+      <div id="reveal" class="hidden">
+        <div id="verdict"></div>
+        <div id="points-earned"></div>
+        <div id="label"></div>
+        <button id="btn-next" onclick="next()">Next &rarr;</button>
       </div>
     </div>
-    <div class="buttons" id="guess-buttons">
-      <button id="btn-ai" onclick="guess('synthetic')">AI</button>
-      <button id="btn-real" onclick="guess('real')">Real cake</button>
-    </div>
-    <div id="reveal" class="hidden">
-      <div id="verdict"></div>
-      <div id="label"></div>
-      <button id="btn-next" onclick="next()">Next &rarr;</button>
+
+    <div id="end" class="hidden">
+      <div id="final-score"></div>
+      <div id="final-msg"></div>
+      <button id="btn-again" onclick="startGame()">Play again</button>
     </div>
   </div>
 
-  <div id="end" class="hidden">
-    <div id="final-score"></div>
-    <div id="final-msg"></div>
-    <button id="btn-again" onclick="startGame()">Play again</button>
+  <div id="intro" class="modal-overlay">
+    <div class="modal-card">
+      <h2>🍰 AI or Cake?</h2>
+      <p>You'll see <b>10 cakes</b>. For each one, decide: is it a <b>real photo</b> or <b>AI-generated</b>?</p>
+      <p>Be quick! Every image starts at <b>10 points</b> and counts down over <b>10 seconds</b> — watch the red bar. A wrong answer or running out of time scores <b>0</b>. Top score: <b>100</b>.</p>
+      <button id="btn-play" onclick="startGame()">▶ Play</button>
+    </div>
   </div>
 
   <script src="script.js"></script>

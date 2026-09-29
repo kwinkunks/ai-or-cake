@@ -124,12 +124,16 @@ const SYNTHETIC = [
 // ---------------------------------------------------------------------------
 // Game
 // ---------------------------------------------------------------------------
-const ROUNDS = 6;
+const ROUNDS = 10;
+const ROUND_MS = 10000;          // time budget per image
+const POINTS_PER_IMAGE = 10;     // max points per image (10 × 10 = 100)
 
-let deck = [];      // the 6 chosen images: { src, type }
+let deck = [];      // the 10 chosen images: { src, type }
 let round = 0;      // 0-based index into deck
-let score = 0;
+let score = 0;      // cumulative points, 0–100
 let answered = false;
+let startTime = 0;  // performance.now() when the current image appeared
+let rafId = null;   // requestAnimationFrame handle for the countdown
 
 // Fisher–Yates shuffle (returns a new array)
 const shuffle = (arr) => {
@@ -180,9 +184,39 @@ const startGame = () => {
   round = 0;
   score = 0;
 
+  document.getElementById('intro').classList.add('hidden');
+  document.getElementById('app').classList.remove('blurred');
   document.getElementById('end').classList.add('hidden');
   document.getElementById('game').classList.remove('hidden');
+  document.getElementById('score-display').textContent = 'Score: 0';
   showImage();
+};
+
+// Points still on the clock for the given remaining time (integer 0–10).
+const pointsAvailable = (remainingMs) =>
+  Math.max(0, Math.ceil((remainingMs / ROUND_MS) * POINTS_PER_IMAGE));
+
+const stopTimer = () => {
+  if (rafId !== null) cancelAnimationFrame(rafId);
+  rafId = null;
+};
+
+const tick = () => {
+  const remaining = ROUND_MS - (performance.now() - startTime);
+  const frac = Math.max(0, remaining / ROUND_MS);
+  document.getElementById('timer-bar').style.transform = `scaleX(${frac})`;
+  document.getElementById('worth').textContent = `Worth now: ${pointsAvailable(remaining)}`;
+  if (remaining <= 0) {
+    timeUp();
+    return;
+  }
+  rafId = requestAnimationFrame(tick);
+};
+
+const startTimer = () => {
+  startTime = performance.now();
+  document.getElementById('timer-bar').style.transform = 'scaleX(1)';
+  rafId = requestAnimationFrame(tick);
 };
 
 const showImage = () => {
@@ -200,10 +234,15 @@ const showImage = () => {
   const frame = document.getElementById('image-frame');
   frame.classList.remove('correct', 'wrong');
 
+  const worth = document.getElementById('worth');
+  worth.textContent = `Worth now: ${POINTS_PER_IMAGE}`;
+  worth.classList.remove('hidden');
+
   document.getElementById('reveal').classList.add('hidden');
   setButtonsEnabled(true);
 
   preload(deck[round + 1] && deck[round + 1].src);
+  startTimer();
 };
 
 const setButtonsEnabled = (on) => {
@@ -214,24 +253,52 @@ const setButtonsEnabled = (on) => {
 const guess = (choice) => {
   if (answered) return;
   answered = true;
+  stopTimer();
   setButtonsEnabled(false);
 
+  const remaining = ROUND_MS - (performance.now() - startTime);
   const current = deck[round];
   const correct = choice === current.type;
-  if (correct) score++;
+  const earned = correct ? pointsAvailable(remaining) : 0;
+  score += earned;
 
-  const frame = document.getElementById('image-frame');
-  frame.classList.add(correct ? 'correct' : 'wrong');
+  showReveal(correct ? 'correct' : 'wrong', earned, current);
+};
+
+// Countdown ran out before an answer: 0 points, revealed as time-up.
+const timeUp = () => {
+  if (answered) return;
+  answered = true;
+  stopTimer();
+  setButtonsEnabled(false);
+  document.getElementById('timer-bar').style.transform = 'scaleX(0)';
+  document.getElementById('worth').textContent = 'Worth now: 0';
+  showReveal('timeout', 0, deck[round]);
+};
+
+const showReveal = (outcome, earned, current) => {
+  const correct = outcome === 'correct';
+
+  document.getElementById('image-frame').classList.add(correct ? 'correct' : 'wrong');
 
   const verdict = document.getElementById('verdict');
-  verdict.textContent = correct ? '✓ Correct!' : '✗ Wrong';
+  verdict.textContent =
+    outcome === 'correct' ? '✓ Correct!'
+      : outcome === 'wrong' ? '✗ Wrong'
+        : "⏱ Time's up!";
   verdict.className = correct ? 'correct' : 'wrong';
+
+  const pts = document.getElementById('points-earned');
+  pts.textContent = `+${earned} point${earned === 1 ? '' : 's'}`;
+  pts.className = earned > 0 ? 'correct' : 'wrong';
 
   document.getElementById('label').textContent =
     current.type === 'synthetic'
       ? 'This one was AI-generated.'
       : 'This one was a real cake.';
 
+  document.getElementById('worth').classList.add('hidden');
+  document.getElementById('score-display').textContent = `Score: ${score}`;
   document.getElementById('reveal').classList.remove('hidden');
 };
 
@@ -247,16 +314,21 @@ const next = () => {
 const endGame = () => {
   document.getElementById('game').classList.add('hidden');
 
-  document.getElementById('final-score').textContent = `${score} / ${ROUNDS}`;
+  const max = ROUNDS * POINTS_PER_IMAGE;
+  document.getElementById('final-score').textContent = `${score} / ${max}`;
 
   let msg;
-  if (score === ROUNDS) msg = 'Perfect — a real connoisseur!';
-  else if (score >= 4) msg = 'Not bad. But AI is getting hard to spot…';
-  else if (score >= 2) msg = 'Trickier than it looks, isn’t it?';
+  if (score === max) msg = 'Flawless and lightning fast. 100/100!';
+  else if (score >= 80) msg = 'Sharp eyes — AI barely fooled you.';
+  else if (score >= 50) msg = 'Not bad, but AI is getting hard to spot.';
+  else if (score >= 20) msg = 'Trickier than it looks, isn’t it?';
   else msg = 'AI fooled you almost every time.';
   document.getElementById('final-msg').textContent = msg;
 
   document.getElementById('end').classList.remove('hidden');
 };
 
-document.addEventListener('DOMContentLoaded', startGame);
+// Show the intro modal (game blurred behind it) until the player hits Play.
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('app').classList.add('blurred');
+});
